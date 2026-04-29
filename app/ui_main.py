@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import cv2
 import numpy as np
@@ -37,7 +37,8 @@ from .config_loader import AppConfig, load_classes, load_yaml
 from .detector import YoloxDetector
 from .overlay import draw_scene
 from .person_reid import PersonReIDService, person_class_index
-from .tracker_adapter import TrackerWrapper
+from .tracker_adapter import TrackerWrapper, TrackedObject
+from .yolov8_pose import infer_poses_for_person_tracks, load_pose_model
 
 
 DARK_STYLESHEET = """
@@ -134,6 +135,7 @@ class ProcessThread(QThread):
         self._mutex_run = False
         self.person_reid: Optional[PersonReIDService] = None
         self._person_cls: Optional[int] = None
+        self.pose_model: Optional[Any] = None
 
     def configure(
         self,
@@ -145,6 +147,7 @@ class ProcessThread(QThread):
         source_path: str,
         person_reid: Optional[PersonReIDService] = None,
         person_class_id: Optional[int] = None,
+        pose_model: Optional[Any] = None,
     ):
         self.cfg = cfg
         self.detector = detector
@@ -154,6 +157,7 @@ class ProcessThread(QThread):
         self.source_path = source_path
         self.person_reid = person_reid
         self._person_cls = person_class_id
+        self.pose_model = pose_model
 
     def stop(self):
         self._stop = True
@@ -180,7 +184,31 @@ class ProcessThread(QThread):
             person_reid_map: dict[int, int] = {}
             if self.person_reid is not None and self._person_cls is not None:
                 person_reid_map = self.person_reid.relabel_tracks(frame, tracks, self._person_cls)
-            self.frame_signal.emit((frame, tracks, preds, person_reid_map), None)
+            pose_results: List[Dict[str, Any]] = []
+            if (
+                self.pose_model is not None
+                and self.cfg is not None
+                and self.cfg.pose_enabled
+                and self._person_cls is not None
+            ):
+                pairs: List[tuple[TrackedObject, tuple[int, int, int, int]]] = []
+                for t in tracks:
+                    if t.class_id != self._person_cls:
+                        continue
+                    x1, y1, x2, y2 = int(t.tlbr[0]), int(t.tlbr[1]), int(t.tlbr[2]), int(t.tlbr[3])
+                    pairs.append((t, (x1, y1, x2, y2)))
+                if pairs:
+                    pose_results = infer_poses_for_person_tracks(
+                        self.pose_model,
+                        frame,
+                        pairs,
+                        imgsz=self.cfg.pose_imgsz,
+                        conf_thres=self.cfg.pose_conf_threshold,
+                        iou_thres=self.cfg.pose_iou_threshold,
+                        kpt_conf_thres=self.cfg.pose_keypoint_conf_threshold,
+                        device=self.cfg.pose_device,
+                    )
+            self.frame_signal.emit((frame, tracks, preds, person_reid_map, pose_results), None)
         cap.release()
 
 
@@ -228,6 +256,7 @@ class MainWindow(QMainWindow):
         self.tracker: Optional[TrackerWrapper] = None
         self.analytics_engine = None
         self.person_reid: Optional[PersonReIDService] = None
+        self.pose_model: Optional[Any] = None
         self._last_rgb_buf = None
         self.worker = ProcessThread(self)
         self.worker.frame_signal.connect(self._on_frame)
@@ -496,6 +525,26 @@ class MainWindow(QMainWindow):
                         f"Re-ID could not be loaded and will be disabled:\n{exc}",
                     )
                     self.person_reid = None
+        self.pose_model = None
+        if cfg.pose_enabled:
+            if not cfg.pose_weights or not Path(cfg.pose_weights).is_file():
+                QMessageBox.warning(
+                    self,
+                    "Pose",
+                    "Pose is enabled but pose.weights path is missing or not a file; pose disabled.",
+                )
+            else:
+                try:
+                    self.pose_model = load_pose_model(
+                        cfg.pose_weights, cfg.pose_device, fuse=True
+                    )
+                except Exception as exc:
+                    QMessageBox.warning(
+                        self,
+                        "Pose",
+                        f"Pose model could not be loaded and will be disabled:\n{exc}",
+                    )
+                    self.pose_model = None
         self._rebuild_dock_cards()
         self.dash_subtitle.setText(
             f"Model ready · {len(classes)} classes · {cfg.device} · {len(cfg.docks)} dock ROI"
@@ -546,6 +595,7 @@ class MainWindow(QMainWindow):
             path,
             person_reid=self.person_reid,
             person_class_id=pcls,
+            pose_model=self.pose_model,
         )
         self.worker.start()
         self.btn_start.setEnabled(False)
@@ -554,7 +604,7 @@ class MainWindow(QMainWindow):
     def _stop(self):
         if self.worker.isRunning():
             self.worker.stop()
-            self.worker.wait(3000)
+            self.worker.wait()
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
 
@@ -563,9 +613,20 @@ class MainWindow(QMainWindow):
             self.events_log.append(f"<span style='color:#ff8a8a'>{err}</span>")
             self._stop()
             return
-        frame, tracks, preds, person_reid_map = payload
+        frame, tracks, preds, person_reid_map, pose_results = payload
         fa: FrameAnalytics = self.analytics_engine.process(tracks, frame.shape[:2])
         pcls = person_class_index(self.class_names, self.cfg.class_names)
+        person_poses: List[Dict[str, Any]] = []
+        for pr in pose_results or []:
+            tid = int(pr.get("track_id", -1))
+            pid = int(person_reid_map.get(tid, -1)) if person_reid_map else -1
+            person_poses.append(
+                {
+                    "person_id": pid,
+                    "bbox": pr.get("bbox", []),
+                    "keypoints": pr.get("keypoints", []),
+                }
+            )
         vis = draw_scene(
             frame,
             tracks,
@@ -574,6 +635,7 @@ class MainWindow(QMainWindow):
             raw_dets=preds,
             person_reid_by_track=person_reid_map if person_reid_map else None,
             person_class_id=pcls,
+            person_poses=person_poses if person_poses else None,
         )
         rgb = np.ascontiguousarray(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB))
         self._last_rgb_buf = rgb

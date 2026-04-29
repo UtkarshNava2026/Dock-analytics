@@ -21,6 +21,8 @@ try:
 except Exception:  # pragma: no cover
     tv_models = None  # type: ignore[assignment]
 
+from .torch_device import resolve_inference_device
+
 
 class OSNetReID:
     """Person Re-ID embedding extractor (torchreid OSNet or torchvision ResNet18 fallback)."""
@@ -32,14 +34,10 @@ class OSNetReID:
         if torch is None:
             raise RuntimeError("PyTorch is required for Re-ID but could not be imported.")
 
-        dev = str(cfg.get("device", "cuda")).strip().lower()
-        if dev == "cpu":
-            self.device = torch.device("cpu")
-        elif torch.cuda.is_available():
-            self.device = torch.device(str(cfg.get("device", "cuda")))
-        else:
-            print("[ReID] CUDA requested but not available; using CPU")
-            self.device = torch.device("cpu")
+        self.device = resolve_inference_device(
+            str(cfg.get("device", "cuda")),
+            context="Re-ID",
+        )
         self.input_size = tuple(cfg["input_size"])  # (H, W) e.g. (256, 128)
 
         self.backend = "torchreid" if torchreid is not None else "torchvision_fallback"

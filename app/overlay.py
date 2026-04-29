@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
 
 from .config_loader import AppConfig, DockRegion
 from .tracker_adapter import TrackedObject
+from .yolov8_pose import draw_pose_on_frame
 
 
 def _px_rect(region: DockRegion, w: int, h: int) -> Tuple[int, int, int, int]:
@@ -64,6 +65,7 @@ def draw_scene(
     raw_dets: Optional[np.ndarray] = None,
     person_reid_by_track: Optional[Dict[int, int]] = None,
     person_class_id: Optional[int] = None,
+    person_poses: Optional[List[Dict[str, Any]]] = None,
 ) -> np.ndarray:
     out = bgr.copy()
     h, w = out.shape[:2]
@@ -128,5 +130,13 @@ def draw_scene(
                 text_thickness,
                 cv2.LINE_AA,
             )
+
+    if person_poses:
+        kth = float(cfg.pose_keypoint_conf_threshold)
+        for pr in person_poses:
+            kpts = np.asarray(pr.get("keypoints", []), dtype=np.float32)
+            if kpts.size == 0:
+                continue
+            draw_pose_on_frame(out, kpts, kpt_conf_thres=kth)
 
     return out

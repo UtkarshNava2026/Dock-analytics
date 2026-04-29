@@ -35,6 +35,13 @@ class AppConfig:
     default_rtsp: str
     reid_enabled: bool
     config_path: str
+    pose_enabled: bool
+    pose_weights: str
+    pose_device: str
+    pose_imgsz: int
+    pose_conf_threshold: float
+    pose_iou_threshold: float
+    pose_keypoint_conf_threshold: float
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "AppConfig":
@@ -54,6 +61,14 @@ class AppConfig:
         src = d.get("sources", {})
         reid = d.get("reid", {}) or {}
         reid_enabled = bool(reid.get("enabled", False))
+        po = d.get("pose", {}) or {}
+        pose_enabled = bool(po.get("enabled", False))
+        pose_weights = os.path.expanduser(str(po.get("weights", "")))
+        pose_device = str(po.get("device", m.get("device", "cuda")))
+        pose_imgsz = int(po.get("imgsz", 640))
+        pose_conf_threshold = float(po.get("conf_threshold", 0.25))
+        pose_iou_threshold = float(po.get("iou_threshold", 0.7))
+        pose_keypoint_conf_threshold = float(po.get("keypoint_conf_threshold", 0.25))
         return cls(
             raw=d,
             exp_file=os.path.expanduser(str(m.get("exp_file", ""))),
@@ -73,6 +88,13 @@ class AppConfig:
             default_rtsp=str(src.get("default_rtsp", "")),
             reid_enabled=reid_enabled,
             config_path="",
+            pose_enabled=pose_enabled,
+            pose_weights=pose_weights,
+            pose_device=pose_device,
+            pose_imgsz=pose_imgsz,
+            pose_conf_threshold=pose_conf_threshold,
+            pose_iou_threshold=pose_iou_threshold,
+            pose_keypoint_conf_threshold=pose_keypoint_conf_threshold,
         )
 
 

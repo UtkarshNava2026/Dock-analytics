@@ -3,7 +3,7 @@ model:
   exp_file: "/home/navavision/Utkarsh_workspace/inference-ui/dock_analytics/model/yolox_voc_s 3.py"           # absolute path to your *exp*.py
   checkpoint: "/home/navavision/Utkarsh_workspace/inference-ui/dock_analytics/model/best_ckpt 2.pth"         # .pth / .ckpt weights
   class_file: "/home/navavision/Utkarsh_workspace/inference-ui/dock_analytics/model/class-dock.txt"         # class.txt one class per line, order matches model head
-  device: "cuda"         # cuda or cpu
+  device: "cuda"         # cuda — fails at load if CUDA unavailable; use "cpu" to allow CPU
   conf_threshold: 0.6
   nms_threshold: 0.45
   test_size: [640, 640]  # [H, W] — should match training / exp if overridden
@@ -19,9 +19,19 @@ tracking:
 # Person Re-ID (optional). Requires PyTorch; install torchreid for OSNet, else ResNet18 fallback.
 reid:
   enabled: true
-  device: "cuda"       # cuda or cpu — falls back to CPU if CUDA unavailable
+  device: "cuda"       # same rules as model.device
   model_name: "osnet_x1_0"
   input_size: [256, 128]   # H, W
+
+# YOLOv8 pose on each person crop (torch.load + raw nn.Module; requires pip: ultralytics for unpickle)
+pose:
+  enabled: true
+  weights: "/home/navavision/Utkarsh_workspace/inference-ui/dock_analytics/yolov8n-pose.pt"
+  device: "cuda"   # same rules as model.device
+  imgsz: 640
+  conf_threshold: 0.25
+  iou_threshold: 0.7
+  keypoint_conf_threshold: 0.25
 
 memory:
   cosine_threshold: 0.6

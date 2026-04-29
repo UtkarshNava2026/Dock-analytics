@@ -22,7 +22,7 @@ pip install -r requirements.txt
    - `model.exp_file` — your YOLOX experiment Python file (`Exp`).
    - `model.checkpoint` — weights (`.pth`).
    - `model.class_file` — `class.txt` (one class name per line, same order as training).
-   - `model.device` — `cuda` or `cpu`.
+   - `model.device` — `cuda` (or `cuda:0`, …) uses the GPU and **fails at load** if CUDA is not available; set `cpu` to run without a GPU. The same applies to `reid.device` and `pose.device`.
    - `docks` — each dock’s `region_xyxy` in **normalized** \[0,1\] coordinates: `[x1, y1, x2, y2]` (top-left to bottom-right).
    - `class_names` — optional mapping if your YAML keys differ from names in `class.txt`. Default YAML matches `class-dock.txt`: `person`, `dock_open`, `truck`, `dock_closed`, `forklift`, `box_in_hand`, `pallet_load`, `no_truck`.
 

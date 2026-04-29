@@ -10,3 +10,5 @@ loguru>=0.7
 pycocotools>=2.0.6
 psutil>=5.9
 git+https://github.com/Megvii-BaseDetection/YOLOX.git
+# Pose (.pt unpickle + inference helpers): pip install ultralytics
+ultralytics>=8.0.0

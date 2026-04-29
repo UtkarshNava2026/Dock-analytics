@@ -10,6 +10,8 @@ from loguru import logger
 from yolox.data.data_augment import ValTransform
 from yolox.utils import fuse_model, get_model_info, postprocess
 
+from .torch_device import resolve_inference_device
+
 
 def _load_exp_module(exp_path: str):
     spec = importlib.util.spec_from_file_location("yolox_user_exp", exp_path)
@@ -33,9 +35,7 @@ class YoloxDetector:
         num_classes: int,
         test_size: Tuple[int, int],
     ):
-        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
-        if self.device.type == "cpu" and device.startswith("cuda"):
-            logger.warning("CUDA not available; using CPU")
+        self.device = resolve_inference_device(device, context="YOLOX detector")
         self.conf_threshold = conf_threshold
         self.nms_threshold = nms_threshold
         self.test_size = test_size
