@@ -1,0 +1,12 @@
+# Use after: conda env create -f environment.yml
+# Or minimal pip-only (requires existing torch):
+PyQt5>=5.15
+opencv-python-headless>=4.8
+PyYAML>=6.0
+scipy>=1.10
+numpy>=1.24
+lap>=0.4.0
+loguru>=0.7
+pycocotools>=2.0.6
+psutil>=5.9
+git+https://github.com/Megvii-BaseDetection/YOLOX.git

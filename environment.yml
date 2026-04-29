@@ -1,0 +1,23 @@
+name: dock_analytics
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch::pytorch
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - pip:
+    - PyQt5>=5.15
+    - opencv-python-headless>=4.8
+    - PyYAML>=6.0
+    - scipy>=1.10
+    - numpy>=1.24
+    - lap>=0.4.0
+    - loguru>=0.7
+    - tabulate>=0.9
+    - pycocotools>=2.0.6
+    - psutil>=5.9
+

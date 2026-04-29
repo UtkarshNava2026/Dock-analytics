@@ -1,0 +1,8 @@
+person
+dock_open
+truck
+dock_closed
+forklift
+box_in_hand
+pallet_load
+no_truck

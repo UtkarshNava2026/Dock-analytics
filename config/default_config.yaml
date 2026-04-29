@@ -1,0 +1,57 @@
+# Paths to your YOLOX assets (edit before run)
+model:
+  exp_file: "/home/navavision/Utkarsh_workspace/inference-ui/dock_analytics/model/yolox_voc_s 3.py"           # absolute path to your *exp*.py
+  checkpoint: "/home/navavision/Utkarsh_workspace/inference-ui/dock_analytics/model/best_ckpt 2.pth"         # .pth / .ckpt weights
+  class_file: "/home/navavision/Utkarsh_workspace/inference-ui/dock_analytics/model/class-dock.txt"         # class.txt one class per line, order matches model head
+  device: "cuda"         # cuda or cpu
+  conf_threshold: 0.6
+  nms_threshold: 0.45
+  test_size: [640, 640]  # [H, W] — should match training / exp if overridden
+
+# ByteTrack (tune for your FPS). Slightly looser matching reduces extra IDs when boxes jitter.
+tracking:
+  track_thresh: 0.45
+  track_buffer: 90
+  match_thresh: 0.85
+  mot20: false
+  frame_rate: 30
+
+# Person Re-ID (optional). Requires PyTorch; install torchreid for OSNet, else ResNet18 fallback.
+reid:
+  enabled: true
+  device: "cuda"       # cuda or cpu — falls back to CPU if CUDA unavailable
+  model_name: "osnet_x1_0"
+  input_size: [256, 128]   # H, W
+
+memory:
+  cosine_threshold: 0.6
+  max_gallery_size: 500
+  feature_dim: 512
+  # 0 = never expire (same person_N after they leave the frame and return). >0 = drop after N seconds unseen.
+  ttl_seconds: 0
+  ema_alpha: 0.3
+  max_feats_per_person: 10
+
+# Class names must match lines in class.txt (case-sensitive).
+# class-dock.txt order: person, dock_open, truck, dock_closed, forklift, box_in_hand, pallet_load, no_truck
+class_names:
+  person: person
+  dock_open: dock_open
+  truck: truck
+  dock_closed: dock_closed
+  forklift: forklift
+  box_in_hand: box_in_hand
+  pallet_load: pallet_load
+  no_truck: no_truck
+
+# Dock regions: coordinates are normalized [0,1] relative to frame width/height
+# x1,y1 = top-left, x2,y2 = bottom-right of the dock ROI (rectangle)
+# ROI: X-AnyLabeling pixel xyxy [379, 0, 1952, 1405] on raw frame 2688×1520
+docks:
+  - id: 1
+    name: "Dock 1"
+    region_xyxy: [0.141012, 0.0, 0.72619, 0.924342]
+
+# Optional default RTSP (overridden from UI)
+sources:
+  default_rtsp: "rtsp://user:pass@192.168.1.10/stream1"
