@@ -42,6 +42,27 @@ class AppConfig:
     pose_conf_threshold: float
     pose_iou_threshold: float
     pose_keypoint_conf_threshold: float
+    pose_activity_motion_deadzone_norm: float
+    pose_activity_active_lower_mean_threshold: float
+    pose_activity_active_centroid_mean_threshold: float
+    pose_activity_active_arm_mean_threshold: float
+    pose_activity_idle_lower_mean_max: float
+    pose_activity_idle_centroid_mean_max: float
+    pose_activity_idle_arm_mean_max: float
+    pose_activity_idle_consecutive_frames: int
+    pose_activity_sit_stable_min_frames: int
+    pose_activity_sit_torso_span_max: float
+    pose_activity_sit_centroid_mean_max: float
+    pose_activity_sit_lower_mean_max: float
+    pose_activity_arm_wrist_weight: float
+    pose_activity_arm_elbow_weight: float
+    pose_activity_arm_shoulder_weight: float
+    pose_activity_smooth_window: int
+    pose_activity_stable_min_frames: int
+    pose_activity_sit_leg_ratio_max: float
+    pose_activity_sit_knee_straight_deg: float
+    pose_activity_sit_hip_flex_deg: float
+    pose_activity_sit_strong_compress_ratio: float
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "AppConfig":
@@ -69,6 +90,59 @@ class AppConfig:
         pose_conf_threshold = float(po.get("conf_threshold", 0.25))
         pose_iou_threshold = float(po.get("iou_threshold", 0.7))
         pose_keypoint_conf_threshold = float(po.get("keypoint_conf_threshold", 0.25))
+        pose_activity_motion_deadzone_norm = float(po.get("activity_motion_deadzone_norm", 0.018))
+        _legacy_walk = float(po.get("activity_walk_norm_threshold", 0.034))
+        _legacy_cent = float(po.get("activity_walk_centroid_norm_threshold", 0.024))
+        _legacy_arm = float(po.get("activity_work_arm_norm_threshold", 0.013))
+        pose_activity_active_lower_mean_threshold = float(
+            po.get("activity_active_lower_mean_threshold", _legacy_walk)
+        )
+        pose_activity_active_centroid_mean_threshold = float(
+            po.get("activity_active_centroid_mean_threshold", _legacy_cent)
+        )
+        pose_activity_active_arm_mean_threshold = float(
+            po.get("activity_active_arm_mean_threshold", _legacy_arm)
+        )
+        pose_activity_idle_lower_mean_max = float(
+            po.get(
+                "activity_idle_lower_mean_max",
+                pose_activity_active_lower_mean_threshold * 0.62,
+            )
+        )
+        pose_activity_idle_centroid_mean_max = float(
+            po.get(
+                "activity_idle_centroid_mean_max",
+                pose_activity_active_centroid_mean_threshold * 0.62,
+            )
+        )
+        pose_activity_idle_arm_mean_max = float(
+            po.get(
+                "activity_idle_arm_mean_max",
+                pose_activity_active_arm_mean_threshold * 0.62,
+            )
+        )
+        pose_activity_idle_consecutive_frames = int(po.get("activity_idle_consecutive_frames", 6))
+        pose_activity_sit_stable_min_frames = int(po.get("activity_sit_stable_min_frames", 5))
+        pose_activity_sit_torso_span_max = float(po.get("activity_sit_torso_span_max", 0.19))
+        pose_activity_sit_centroid_mean_max = float(po.get("activity_sit_centroid_mean_max", 0.011))
+        pose_activity_sit_lower_mean_max = float(po.get("activity_sit_lower_mean_max", 0.012))
+        pose_activity_arm_wrist_weight = float(
+            po.get("activity_arm_wrist_weight", po.get("activity_work_wrist_weight", 1.0))
+        )
+        pose_activity_arm_elbow_weight = float(
+            po.get("activity_arm_elbow_weight", po.get("activity_work_elbow_weight", 0.52))
+        )
+        pose_activity_arm_shoulder_weight = float(
+            po.get("activity_arm_shoulder_weight", po.get("activity_work_shoulder_weight", 0.22))
+        )
+        pose_activity_smooth_window = int(po.get("activity_smooth_window", 18))
+        pose_activity_stable_min_frames = int(po.get("activity_stable_min_frames", 8))
+        pose_activity_sit_leg_ratio_max = float(po.get("activity_sit_leg_ratio_max", 0.36))
+        pose_activity_sit_knee_straight_deg = float(po.get("activity_sit_knee_straight_deg", 140.0))
+        pose_activity_sit_hip_flex_deg = float(po.get("activity_sit_hip_flex_deg", 112.0))
+        pose_activity_sit_strong_compress_ratio = float(
+            po.get("activity_sit_strong_compress_ratio", 0.26)
+        )
         return cls(
             raw=d,
             exp_file=os.path.expanduser(str(m.get("exp_file", ""))),
@@ -95,6 +169,27 @@ class AppConfig:
             pose_conf_threshold=pose_conf_threshold,
             pose_iou_threshold=pose_iou_threshold,
             pose_keypoint_conf_threshold=pose_keypoint_conf_threshold,
+            pose_activity_motion_deadzone_norm=pose_activity_motion_deadzone_norm,
+            pose_activity_active_lower_mean_threshold=pose_activity_active_lower_mean_threshold,
+            pose_activity_active_centroid_mean_threshold=pose_activity_active_centroid_mean_threshold,
+            pose_activity_active_arm_mean_threshold=pose_activity_active_arm_mean_threshold,
+            pose_activity_idle_lower_mean_max=pose_activity_idle_lower_mean_max,
+            pose_activity_idle_centroid_mean_max=pose_activity_idle_centroid_mean_max,
+            pose_activity_idle_arm_mean_max=pose_activity_idle_arm_mean_max,
+            pose_activity_idle_consecutive_frames=pose_activity_idle_consecutive_frames,
+            pose_activity_sit_stable_min_frames=pose_activity_sit_stable_min_frames,
+            pose_activity_sit_torso_span_max=pose_activity_sit_torso_span_max,
+            pose_activity_sit_centroid_mean_max=pose_activity_sit_centroid_mean_max,
+            pose_activity_sit_lower_mean_max=pose_activity_sit_lower_mean_max,
+            pose_activity_arm_wrist_weight=pose_activity_arm_wrist_weight,
+            pose_activity_arm_elbow_weight=pose_activity_arm_elbow_weight,
+            pose_activity_arm_shoulder_weight=pose_activity_arm_shoulder_weight,
+            pose_activity_smooth_window=pose_activity_smooth_window,
+            pose_activity_stable_min_frames=pose_activity_stable_min_frames,
+            pose_activity_sit_leg_ratio_max=pose_activity_sit_leg_ratio_max,
+            pose_activity_sit_knee_straight_deg=pose_activity_sit_knee_straight_deg,
+            pose_activity_sit_hip_flex_deg=pose_activity_sit_hip_flex_deg,
+            pose_activity_sit_strong_compress_ratio=pose_activity_sit_strong_compress_ratio,
         )
 
 

@@ -27,11 +27,46 @@ reid:
 pose:
   enabled: true
   weights: "/home/navavision/Utkarsh_workspace/inference-ui/dock_analytics/yolov8n-pose.pt"
-  device: "cuda"   # same rules as model.device
+  device: "cuda"
   imgsz: 640
   conf_threshold: 0.25
   iou_threshold: 0.7
   keypoint_conf_threshold: 0.25
+
+  activity_motion_deadzone_norm: 0.019
+
+  # Walking thresholds — any one triggers walking
+  activity_active_lower_mean_threshold: 0.028
+  activity_active_centroid_mean_threshold: 0.024
+  activity_active_arm_mean_threshold: 0.040
+
+  # Idle caps — all three must be below these for activity_idle_consecutive_frames in a row
+  activity_idle_lower_mean_max: 0.016
+  activity_idle_centroid_mean_max: 0.013
+  activity_idle_arm_mean_max: 0.010
+  activity_idle_consecutive_frames: 7
+
+  # Smoothing
+  activity_smooth_window: 18
+  activity_stable_min_frames: 8
+
+  # Arm weights
+  activity_arm_wrist_weight: 1.0
+  activity_arm_elbow_weight: 0.52
+  activity_arm_shoulder_weight: 0.22
+
+  # Sitting — motion stillness + spatial zone, no geometry
+  activity_sit_centroid_mean_max: 0.005    # was 0.008 — seated guard is virtually motionless
+  activity_sit_lower_mean_max: 0.006       # was 0.009 — standing still still has more lower body motion
+  activity_sit_stable_min_frames: 12       # was 8 — need longer confirmation to avoid false positives
+  activity_sit_bbox_x2_max: 0.32           # was 0.35 — tighter zone, only the guard desk corner # right edge of bbox must be in left 35% of frame; 0.0 = disabled
+
+  # Keep these in config for reference but they are no longer used in logic
+  activity_sit_torso_span_max: 0.42
+  activity_sit_leg_ratio_max: 0.50
+  activity_sit_knee_straight_deg: 182
+  activity_sit_hip_flex_deg: 135
+  activity_sit_strong_compress_ratio: 0.38
 
 memory:
   cosine_threshold: 0.6

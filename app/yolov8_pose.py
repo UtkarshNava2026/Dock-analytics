@@ -30,7 +30,6 @@ except Exception:  # pragma: no cover
 
 from .torch_device import resolve_inference_device
 
-
 # COCO-17 skeleton edges (per user spec)
 COCO_POSE_EDGES: List[Tuple[int, int]] = [
     (0, 1),
@@ -52,6 +51,18 @@ COCO_POSE_EDGES: List[Tuple[int, int]] = [
 ]
 
 NUM_KPTS = 17
+
+_bbox_ema: Dict[int, List[float]] = {}
+
+
+def smooth_bbox(track_id: int, bbox: List[float], alpha: float = 0.4) -> List[float]:
+    if track_id not in _bbox_ema:
+        _bbox_ema[track_id] = list(bbox)
+        return list(bbox)
+    s = _bbox_ema[track_id]
+    s = [alpha * b + (1 - alpha) * p for b, p in zip(bbox, s)]
+    _bbox_ema[track_id] = s
+    return s
 
 
 def _model_kpt_shape(model: Any) -> Tuple[int, int]:
@@ -140,7 +151,6 @@ def letterbox(
     bgr: np.ndarray,
     new_shape: Tuple[int, int] = (640, 640),
     color: Tuple[int, int, int] = (114, 114, 114),
-    stride: int = 32,
 ) -> Tuple[np.ndarray, LetterboxMeta]:
     """Resize with aspect ratio and pad to ``new_shape`` (H, W). Returns BGR uint8 and meta for inverse mapping."""
     h0, w0 = bgr.shape[:2]
@@ -156,12 +166,6 @@ def letterbox(
     else:
         resized = bgr
     out = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
-    # Make final size divisible by stride (matches common YOLO letterbox behavior)
-    out_h, out_w = out.shape[:2]
-    pad_h = (stride - out_h % stride) % stride
-    pad_w = (stride - out_w % stride) % stride
-    if pad_h or pad_w:
-        out = cv2.copyMakeBorder(out, 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=color)
     h_out, w_out = out.shape[:2]
     meta = LetterboxMeta(
         ratio=(r, r),
@@ -357,6 +361,7 @@ def infer_poses_for_person_tracks(
     if model is None or torch is None:
         return []
     fh, fw = frame_bgr.shape[:2]
+    print(f"[FRAME SIZE] height={fh} width={fw}")
     dev = _resolve_device(device)
     tensors: List[torch.Tensor] = []
     metas: List[LetterboxMeta] = []
@@ -364,8 +369,11 @@ def infer_poses_for_person_tracks(
     bboxes: List[Tuple[int, int, int, int]] = []
 
     for tr, (x1, y1, x2, y2) in tracks_tlbr:
-        x1, y1 = max(0, int(x1)), max(0, int(y1))
-        x2, y2 = min(fw, int(x2)), min(fh, int(y2))
+        raw_bbox = [float(x1), float(y1), float(x2), float(y2)]
+        smoothed = smooth_bbox(int(getattr(tr, "track_id", -1)), raw_bbox, alpha=0.4)
+        x1, y1, x2, y2 = int(smoothed[0]), int(smoothed[1]), int(smoothed[2]), int(smoothed[3])
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(fw, x2), min(fh, y2)
         if x2 <= x1 + 1 or y2 <= y1 + 1:
             continue
         crop = frame_bgr[y1:y2, x1:x2]
@@ -378,7 +386,7 @@ def infer_poses_for_person_tracks(
         tensors.append(t.squeeze(0))
         metas.append(meta)
         track_refs.append(tr)
-        bboxes.append((x1, y1, x2, y2))
+        bboxes.append((raw_bbox, smoothed, (x1, y1, x2, y2)))
 
     if not tensors:
         return []
@@ -395,19 +403,23 @@ def infer_poses_for_person_tracks(
 
     nkpt = int(_model_kpt_shape(model)[0])
     results: List[Dict[str, Any]] = []
-    for tr, bbox, meta, k_crop in zip(track_refs, bboxes, metas, kpt_batches):
+    for tr, bbox_pack, meta, k_crop in zip(track_refs, bboxes, metas, kpt_batches):
+        raw_bbox, smoothed, crop_xyxy = bbox_pack
+        crop_tlbr = (float(crop_xyxy[0]), float(crop_xyxy[1]), float(crop_xyxy[2]), float(crop_xyxy[3]))
         if k_crop is None:
             k_full = np.zeros((nkpt, 3), dtype=np.float32)
         else:
-            k_full = keypoints_crop_to_full_frame(k_crop, meta, bbox)
+            k_full = keypoints_crop_to_full_frame(k_crop, meta, crop_tlbr)
         low = k_full[:, 2] < kpt_conf_thres
         k_full = k_full.copy()
         k_full[low] = 0.0
         results.append(
             {
                 "track_id": int(getattr(tr, "track_id", -1)),
-                "bbox": [float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])],
+                "bbox": raw_bbox,
+                "smoothed_bbox": smoothed,
                 "keypoints": k_full.tolist(),
+                "frame_width": int(fw),
             }
         )
     return results

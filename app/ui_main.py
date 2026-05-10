@@ -38,6 +38,7 @@ from .detector import YoloxDetector
 from .overlay import draw_scene
 from .person_reid import PersonReIDService, person_class_index
 from .tracker_adapter import TrackerWrapper, TrackedObject
+from .pose_activity import PoseActivityTracker
 from .yolov8_pose import infer_poses_for_person_tracks, load_pose_model
 
 
@@ -136,6 +137,7 @@ class ProcessThread(QThread):
         self.person_reid: Optional[PersonReIDService] = None
         self._person_cls: Optional[int] = None
         self.pose_model: Optional[Any] = None
+        self._pose_activity: Optional[PoseActivityTracker] = None
 
     def configure(
         self,
@@ -158,6 +160,11 @@ class ProcessThread(QThread):
         self.person_reid = person_reid
         self._person_cls = person_class_id
         self.pose_model = pose_model
+        self._pose_activity = (
+            PoseActivityTracker(cfg)
+            if cfg is not None and cfg.pose_enabled and pose_model is not None
+            else None
+        )
 
     def stop(self):
         self._stop = True
@@ -208,6 +215,8 @@ class ProcessThread(QThread):
                         kpt_conf_thres=self.cfg.pose_keypoint_conf_threshold,
                         device=self.cfg.pose_device,
                     )
+                    if self._pose_activity is not None and pose_results:
+                        pose_results = self._pose_activity.label_batch(pose_results)
             self.frame_signal.emit((frame, tracks, preds, person_reid_map, pose_results), None)
         cap.release()
 
@@ -622,9 +631,11 @@ class MainWindow(QMainWindow):
             pid = int(person_reid_map.get(tid, -1)) if person_reid_map else -1
             person_poses.append(
                 {
+                    "track_id": tid,
                     "person_id": pid,
                     "bbox": pr.get("bbox", []),
                     "keypoints": pr.get("keypoints", []),
+                    "activity": pr.get("activity"),
                 }
             )
         vis = draw_scene(
